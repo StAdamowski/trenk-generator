@@ -129,7 +129,7 @@ const validateCode = (val) => {
     notEmptyStr,
     isNumber,
     isGreater(1000),
-    isLess(9999)
+    isLess(9999),
   );
 };
 
@@ -230,7 +230,7 @@ const genPass = (date, code) => {
 
 const formValidDate = (dateObj) => {
   return `${dateObj.year}${convertNumTwo(dateObj.month)}${convertNumTwo(
-    dateObj.day
+    dateObj.day,
   )}`;
 };
 
@@ -245,9 +245,9 @@ const copyText = (selector) => {
 };
 
 stateAtom.addWatcher((s) => {
-  if (!s.day || !s.month || !s.year) return;
+  if (!s.day || !s.month || !s.year || !s.code) return;
 
-  let sanitizedDate = formValidDate(s);
+  const sanitizedDate = formValidDate(s);
 
   outputBox.textContent = genPass(sanitizedDate, s.code);
 });
