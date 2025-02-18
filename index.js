@@ -25,6 +25,24 @@ function Atom(initValue) {
   };
 }
 
+const subs = (atom, field, fn) => {
+  let previousFieldValue;
+
+  atom.addWatcher((newValue) => {
+    if (
+      typeof newValue === "object" &&
+      newValue !== null &&
+      field in newValue
+    ) {
+      const currentFieldValue = newValue[field];
+      if (currentFieldValue !== previousFieldValue) {
+        fn(currentFieldValue);
+        previousFieldValue = currentFieldValue;
+      }
+    }
+  });
+};
+
 function ok(v) {
   return { ok: v };
 }
@@ -72,12 +90,21 @@ let dayErrorField;
 let monthErrorField;
 let yearErrorField;
 let codeErrorField;
+let saveCredButton;
+let saveDateContainer;
+let mainContainer;
+let saveDateButtonYes;
+let saveDateButtonNo;
 
-const stateAtom = Atom({ day: null, month: null, year: null, code: null });
-
-const isNotEmpty = (v) => {
-  return v.length > 0 ? ok(v) : err(`Nie moze byc puste`);
-};
+const stateAtom = Atom({
+  day: null,
+  month: null,
+  year: null,
+  code: null,
+  showDateModal: false,
+  activateSavePopupButton: false,
+  dateLoadedeFromLocalStorage: false,
+});
 
 const isNumber = (v) => {
   return Number.parseInt(v) ? ok(v) : err(`liczby sa oczekiwane`);
@@ -147,7 +174,79 @@ const processInput = ({ val, field, validator, errorField, state }) => {
   }
 };
 
-document.addEventListener("DOMContentLoaded", () => {
+const closePopupsOnOuterClick = () => {
+  saveDateContainer.addEventListener("click", (e) => {
+    e.stopPropagation();
+  });
+
+  saveCredButton.addEventListener("click", (e) => {
+    e.stopPropagation();
+  });
+
+  saveDateContainer.addEventListener("touchstart", (e) => {
+    e.stopPropagation();
+  });
+
+  saveCredButton.addEventListener("touchstart", (e) => {
+    e.stopPropagation();
+  });
+
+  window.addEventListener("click", (_e) => {
+    stateAtom.update((ov) => ({ ...ov, showDateModal: false }));
+  });
+
+  window.addEventListener(
+    "touchstart",
+    (_e) => {
+      _e.preventDefault();
+      _e.stopPropagation();
+      stateAtom.update((ov) => ({ ...ov, showDateModal: false }));
+    },
+    { passive: false },
+  );
+};
+
+const onDOMLoaded = (fn) => {
+  document.addEventListener("DOMContentLoaded", fn);
+};
+
+const hideDateModal = () => {
+  saveDateContainer.classList.remove("show-date-popup");
+  mainContainer.classList.remove("blur-background");
+  mainContainer.classList.remove("disable-input");
+  saveCredButton.classList.remove("disable-input");
+
+  saveDateContainer.classList.add("hide-date-popup");
+};
+
+const showDateModal = () => {
+  mainContainer.classList.add("blur-background");
+  mainContainer.classList.add("disable-input");
+  saveDateContainer.classList.add("show-date-popup");
+  saveCredButton.classList.add("disable-input");
+
+  saveDateContainer.classList.remove("hide-date-popup");
+};
+
+const activateSavePopupButton = () => {
+  saveCredButton.addEventListener("click", (_e) => {
+    stateAtom.update((ov) => ({
+      ...ov,
+      showDateModal: true,
+      activateSavePopupButton: true,
+    }));
+  });
+};
+
+const saveDateToLocalStorage = () => {
+  const { day, month, year } = stateAtom.val();
+  if (day && month && year) {
+    localStorage.setItem("birthDate", JSON.stringify({ day, month, year }));
+  }
+};
+
+onDOMLoaded(() => {
+  mainContainer = document.querySelector(".main-container");
   dayInp = document.querySelector(".date-input-container-day>input");
   monthInp = document.querySelector(".date-input-container-month>input");
   yearInp = document.querySelector(".date-input-container-year>input");
@@ -159,6 +258,21 @@ document.addEventListener("DOMContentLoaded", () => {
   monthErrorField = document.querySelector(".month-error-field");
   yearErrorField = document.querySelector(".year-error-field");
   codeErrorField = document.querySelector(".code-error-field");
+  saveCredButton = document.querySelector(".save-credentials-button");
+  saveDateContainer = document.querySelector(".save-popup-container");
+  saveDateButtonYes = document.querySelector(".save-popup-save-button");
+  saveDateButtonNo = document.querySelector(".save-popup-discard-button");
+
+  closePopupsOnOuterClick();
+
+  saveDateButtonYes.addEventListener("click", (_e) => {
+    stateAtom.update((ov) => ({ ...ov, showDateModal: false }));
+    saveDateToLocalStorage();
+  });
+
+  saveDateButtonNo.addEventListener("click", (_e) => {
+    stateAtom.update((ov) => ({ ...ov, showDateModal: false }));
+  });
 
   dayInp.addEventListener("input", (e) => {
     const val = e.target.value ? e.target.value : "";
@@ -207,6 +321,26 @@ document.addEventListener("DOMContentLoaded", () => {
   copyButton.addEventListener("click", (_e) => {
     copyText(outputBox);
   });
+
+  const birthDateStore = localStorage.getItem("birthDate");
+
+  if (birthDateStore) {
+    const parsed = JSON.parse(birthDateStore);
+    dayInp.value = parsed.day;
+    monthInp.value = parsed.month;
+    yearInp.value = parsed.year;
+    stateAtom.set({ day: parsed.day, month: parsed.month, year: parsed.year });
+    stateAtom.update((ov) => ({
+      ...ov,
+      activateSavePopupButton: true,
+      dateLoadedeFromLocalStorage: true,
+    }));
+  } else {
+    stateAtom.update((ov) => ({
+      ...ov,
+      dateLoadedeFromLocalStorage: false,
+    }));
+  }
 });
 
 const convertNumTwo = (s) => {
@@ -245,9 +379,35 @@ const copyText = (selector) => {
 };
 
 stateAtom.addWatcher((s) => {
-  if (!s.day || !s.month || !s.year || !s.code) return;
+  if (!s.day || !s.month || !s.year) return;
+
+  if (!s.activateSavePopupButton) activateSavePopupButton();
 
   const sanitizedDate = formValidDate(s);
 
   outputBox.textContent = genPass(sanitizedDate, s.code);
+});
+
+subs(stateAtom, "showDateModal", (v) => {
+  if (v) {
+    showDateModal();
+  } else {
+    hideDateModal();
+  }
+});
+
+subs(stateAtom, "dateLoadedeFromLocalStorage", (d) => {
+  if (d) {
+    codeInp.focus();
+  } else {
+    dayInp.focus();
+  }
+});
+
+subs(stateAtom, "code", (v) => {
+  if (v) {
+    copyButton.classList.add("cb-green");
+  } else {
+    copyButton.classList.remove("cb-green");
+  }
 });
