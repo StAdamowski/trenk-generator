@@ -379,13 +379,19 @@ const copyText = (selector) => {
 };
 
 stateAtom.addWatcher((s) => {
+  // copyButton.classList.remove("cb-green");
+
   if (!s.day || !s.month || !s.year) return;
 
   if (!s.activateSavePopupButton) activateSavePopupButton();
 
   const sanitizedDate = formValidDate(s);
+  const generatedPass = genPass(sanitizedDate, s.code);
 
-  outputBox.textContent = genPass(sanitizedDate, s.code);
+  if (generatedPass) {
+    outputBox.textContent = generatedPass;
+    // copyButton.classList.add("cb-green");
+  }
 });
 
 subs(stateAtom, "showDateModal", (v) => {
