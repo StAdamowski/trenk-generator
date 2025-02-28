@@ -104,6 +104,7 @@ const stateAtom = Atom({
   showDateModal: false,
   activateSavePopupButton: false,
   dateLoadedeFromLocalStorage: false,
+  validationError: null,
 });
 
 const isNumber = (v) => {
@@ -168,11 +169,27 @@ const processInput = ({ val, field, validator, errorField, state }) => {
     state.update((ov) => ({
       ...ov,
       [field]: val,
+      validationError: null,
     }));
   } else {
+    const errorObj = {
+      from: field,
+      err: validation.err,
+      value: val,
+    };
+    console.log(field, "validation failed", errorObj);
+
+    state.update((ov) => ({
+      ...ov,
+      validationError: errorObj,
+      // [field]: validation
+    }));
+    // TODO: what to do when valdiation failed
     errorField.textContent = validation["err"];
   }
 };
+
+stateAtom.addWatcher(console.log);
 
 const closePopupsOnOuterClick = () => {
   saveDateContainer.addEventListener("click", (e) => {
@@ -197,9 +214,8 @@ const closePopupsOnOuterClick = () => {
 
   window.addEventListener(
     "touchstart",
-    (_e) => {
-      _e.preventDefault();
-      _e.stopPropagation();
+    (e) => {
+      e.stopPropagation();
       stateAtom.update((ov) => ({ ...ov, showDateModal: false }));
     },
     { passive: false },
@@ -245,7 +261,7 @@ const saveDateToLocalStorage = () => {
   }
 };
 
-onDOMLoaded(() => {
+const initQuerySelectors = () => {
   mainContainer = document.querySelector(".main-container");
   dayInp = document.querySelector(".date-input-container-day>input");
   monthInp = document.querySelector(".date-input-container-month>input");
@@ -262,9 +278,9 @@ onDOMLoaded(() => {
   saveDateContainer = document.querySelector(".save-popup-container");
   saveDateButtonYes = document.querySelector(".save-popup-save-button");
   saveDateButtonNo = document.querySelector(".save-popup-discard-button");
+};
 
-  closePopupsOnOuterClick();
-
+const addEventListeners = () => {
   saveDateButtonYes.addEventListener("click", (_e) => {
     stateAtom.update((ov) => ({ ...ov, showDateModal: false }));
     saveDateToLocalStorage();
@@ -321,7 +337,9 @@ onDOMLoaded(() => {
   copyButton.addEventListener("click", (_e) => {
     copyText(outputBox);
   });
+};
 
+const checkLocalStorage = () => {
   const birthDateStore = localStorage.getItem("birthDate");
 
   if (birthDateStore) {
@@ -341,6 +359,13 @@ onDOMLoaded(() => {
       dateLoadedeFromLocalStorage: false,
     }));
   }
+};
+
+onDOMLoaded(() => {
+  initQuerySelectors();
+  closePopupsOnOuterClick();
+  addEventListeners();
+  checkLocalStorage();
 });
 
 const convertNumTwo = (s) => {
@@ -379,19 +404,13 @@ const copyText = (selector) => {
 };
 
 stateAtom.addWatcher((s) => {
-  // copyButton.classList.remove("cb-green");
-
   if (!s.day || !s.month || !s.year) return;
 
   if (!s.activateSavePopupButton) activateSavePopupButton();
 
   const sanitizedDate = formValidDate(s);
   const generatedPass = genPass(sanitizedDate, s.code);
-
-  if (generatedPass) {
-    outputBox.textContent = generatedPass;
-    // copyButton.classList.add("cb-green");
-  }
+  outputBox.textContent = generatedPass;
 });
 
 subs(stateAtom, "showDateModal", (v) => {
@@ -410,10 +429,10 @@ subs(stateAtom, "dateLoadedeFromLocalStorage", (d) => {
   }
 });
 
-subs(stateAtom, "code", (v) => {
-  if (v) {
-    copyButton.classList.add("cb-green");
-  } else {
+subs(stateAtom, "validationError", (v) => {
+  if (v && v.from === "code") {
     copyButton.classList.remove("cb-green");
+  } else {
+    copyButton.classList.add("cb-green");
   }
 });
