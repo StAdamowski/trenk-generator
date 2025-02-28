@@ -177,7 +177,6 @@ const processInput = ({ val, field, validator, errorField, state }) => {
       err: validation.err,
       value: val,
     };
-    console.log(field, "validation failed", errorObj);
 
     state.update((ov) => ({
       ...ov,
@@ -188,8 +187,6 @@ const processInput = ({ val, field, validator, errorField, state }) => {
     errorField.textContent = validation["err"];
   }
 };
-
-stateAtom.addWatcher(console.log);
 
 const closePopupsOnOuterClick = () => {
   saveDateContainer.addEventListener("click", (e) => {
